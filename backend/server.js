@@ -9,30 +9,87 @@ const items = [
 ];
 
 app.get('/api/items', (req, res) => {
-    res.json(items);
+    const { name, sort, order, page, limit } = req.query;
+
+    let result = [...items];
+
+    if(name !== undefined){
+        if(typeof name !== 'string'){
+            return res.status(400).json({error: 'Parâmetros name inválido'});
+        }
+        const term = name.trim().toLowerCase();
+        result = result.filter(item => 
+            item.name.toLowerCase().includes(term)
+        );
+    }
+
+
+    if (sort){
+        if (sort !== 'id' && sort !== 'name'){
+            return res.status(400).json({error: 'Parâmetro sort inválido. Utilize "id" ou "name"'})
+        }
+        const orderDir = (order && order.toLowerCase() == 'desc') ? -1 : 1;
+        result.sort((a, b) => {
+            if(a[sort] < b[sort]) return -1 * orderDir;
+            if(a[sort] > b[sort]) return 1 * orderDir;
+            return 0;
+        });
+    }
+
+    if(page !== undefined || limit !== undeffined){
+        const pageNum = Number(page || 1);
+        const limitNum = Numer(limit || 10);
+
+        if(!Number.isInteger(pageNum) || pageNum < 1 || !Number.isInteger(limitNum) || limitNum < 1){
+            return res.status(400).json({error: 'Parâmetros de paginação inválidos. Use inteiros positivos'})
+        }
+        const total = result.lenght;
+        const startIndex = (pageNum - 1) * limitNum;
+        const paginatedItems = result.slice(startIndex, startIndex + limitNum);
+
+        return res.status(200).json({
+            page: pageNum,
+            limit: limitNum,
+            total,
+            items:paginatedItems
+        });
+    }
+
+    res.status(200).json(result);
 });
 
 app.get('/api/items/:id', (req, res) => {
     const id = Number(req.params.id);
+
+    if(!Number.isInteger(id) || id >= 0){
+        return res.status(400).json({
+            error: 'id inválido'
+        });
+    }
+
     const item = items.find(item => item.id === id);
 
     if(!item){
-        return res.status(404).json({ error: 'Item não encontrado'});
+        return res.status(400).json({error: 'Item não encontrado'});
     }
 
-    res.json(item);
+    res.status(200).json(item);
 });
 
 app.post('/api/items', (req, res) => {
     const {name} = req.body;
 
-    if(!name){
-        return res.status(400).json({ error: 'O campo name é obrigatório'});
+    if(typeof name != 'string' || name.trim() === ''){
+        return res.status(400).json({
+            error: 'name é obrigatório e deve ser texto não vazio'
+        });
     }
 
     const newItem = {
-        if: items.lenght ? Math.max(...items.map(item => item.id)) + 1 : 1,
-        name
+        id: items.lenght 
+        ? Math.max(...items.map(item => item.id)) + 1 
+        : 1,
+        name: name.trim()
     };
     items.push(newItem);
 
@@ -41,26 +98,38 @@ app.post('/api/items', (req, res) => {
 
 app.put('/api/items/:id', (req, res) => {
     const id = Number(req.params.id);
+
+    if(!Number.isInteger(id) || id <= 0){
+        return res.status(404).json({error: 'Item não encontrado'});
+    }
+
     const item = items.find (item => item.id === id);
 
     if(!item){
         return res.status(404).json({ error: 'Item não encontrado'});
     }
-    const {name} = req.body;
-    if(!name){
+
+    const {name} = req.body || {};
+
+    if(typeof name !== 'string' || name.trim() === ''){
         return res.status(400).json({ error: 'O campo name é obrigatório'});
     }
 
-    item.name = name;
-    res.json(item);
+    item.name = name.trim();
+    res.status(200).json(item);
 });
 
 app.delete('/api/items/:id', (req, res) => {
     const id = Number(req.params.id);
+
+    if(!Number.isInteger(id) || id <= 0){
+        return res.status(404).json({error: 'id inválido'})
+    }
+
     const index = items.findIndex(item => item.id === id);
 
     if(index === -1){
-        return res.status(404).json({error:'O campo name é obrigatório'});
+        return res.status(404).json({error:'Item não encontrado'});
     }
 
     items.splice(index, 1);
